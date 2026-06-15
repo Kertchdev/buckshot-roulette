@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buckshot Roulette - Multiplayer</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Menu Principal -->
+        <div id="main-menu" class="screen active">
+            <h1 class="title-glitch" data-text="BUCKSHOT ROULETTE">BUCKSHOT ROULETTE</h1>
+            <div class="menu-buttons">
+                <button id="btn-local" class="btn-primary">Multijoueur Local</button>
+                <button id="btn-ai-setup" class="btn-primary">Contre l'IA</button>
+                <button id="btn-online" class="btn-secondary" disabled title="Serveur requis">En Ligne</button>
+            </div>
+        </div>
+
+        <!-- Setup Partie -->
+        <div id="setup-screen" class="screen hidden">
+            <h2 id="setup-title">Préparation de la partie</h2>
+            <div class="input-group">
+                <label for="player1-name">Joueur 1 :</label>
+                <input type="text" id="player1-name" value="Joueur 1">
+            </div>
+            
+            <div class="input-group" id="p2-input-group">
+                <label for="player2-name">Joueur 2 :</label>
+                <input type="text" id="player2-name" value="Joueur 2">
+            </div>
+            
+            <div class="input-group hidden" id="ai-difficulty-group">
+                <label for="ai-difficulty">Difficulté de l'IA :</label>
+                <select id="ai-difficulty" class="styled-select">
+                    <option value="easy">Facile (Aléatoire)</option>
+                    <option value="medium" selected>Moyen (Probabilités)</option>
+                    <option value="hard">Difficile (Stratège)</option>
+                </select>
+            </div>
+            
+            <button id="btn-start-game" class="btn-primary">Lancer la partie</button>
+            <button id="btn-back-menu" class="btn-secondary">Retour</button>
+        </div>
+
+        <!-- Écran de Jeu -->
+        <div id="game-screen" class="screen hidden">
+            
+            <!-- Interface Joueur 2 (Haut) -->
+            <div id="player2-ui" class="player-zone opponent">
+                <div class="player-info">
+                    <h3 id="p2-name">Joueur 2</h3>
+                    <div class="health-bar" id="p2-health">
+                        <div class="heart active"></div>
+                        <div class="heart active"></div>
+                        <div class="heart active"></div>
+                    </div>
+                </div>
+                <div class="inventory" id="p2-inventory">
+                    <!-- Items -->
+                </div>
+            </div>
+
+            <!-- Table Centrale (Chargeur, Action) -->
+            <div class="center-table">
+                <div id="round-info" class="round-info">
+                    <p id="round-announcement">Préparez-vous...</p>
+                    <div class="magazine-stats">
+                        <span class="live-count"><span id="count-live">0</span> Réelles</span>
+                        <span class="blank-count"><span id="count-blank">0</span> À Blanc</span>
+                    </div>
+                </div>
+                <div class="gun-container">
+                    <div class="gun">🔫</div>
+                    <div class="magazine-status" id="magazine-status">
+                        Balles restantes : <span id="bullets-left">0</span>
+                    </div>
+                </div>
+                <div class="action-buttons" id="action-panel">
+                    <button id="btn-shoot-self" class="btn-action btn-danger">Se tirer dessus</button>
+                    <button id="btn-shoot-opponent" class="btn-action btn-attack">Tirer sur l'adversaire</button>
+                </div>
+            </div>
+
+            <!-- Interface Joueur 1 (Bas) -->
+            <div id="player1-ui" class="player-zone active-turn">
+                <div class="player-info">
+                    <h3 id="p1-name">Joueur 1</h3>
+                    <div class="health-bar" id="p1-health">
+                        <div class="heart active"></div>
+                        <div class="heart active"></div>
+                        <div class="heart active"></div>
+                    </div>
+                </div>
+                <div class="inventory" id="p1-inventory">
+                    <!-- Items -->
+                </div>
+            </div>
+
+            <!-- Log des actions -->
+            <div id="action-log" class="action-log">
+                <ul></ul>
+            </div>
+        </div>
+
+        <!-- Écran Game Over -->
+        <div id="game-over-screen" class="screen hidden">
+            <h1 id="winner-name" class="title-glitch">Vainqueur !</h1>
+            <p id="game-over-stats"></p>
+            <button id="btn-rematch" class="btn-primary">Rejouer</button>
+            <button id="btn-quit" class="btn-secondary">Menu Principal</button>
+        </div>
+
+        <!-- Effets Visuels Globaux (Flash, Sang) -->
+        <div id="screen-flash" class="overlay hidden"></div>
+        <div id="screen-blood" class="overlay hidden"></div>
+
+        <!-- Modal Secret (Téléphone) -->
+        <div id="phone-modal" class="overlay hidden" style="pointer-events: all;">
+            <div class="phone-modal-box">
+                <div class="phone-modal-icon">📱</div>
+                <h2>Chuchotement secret</h2>
+                <p id="phone-modal-warning">Avant de continuer, <strong>cachez l'écran de votre adversaire !</strong><br><br>Une information secrète va être révélée...</p>
+                <button id="phone-reveal-btn" class="btn-primary">Révéler l'indice 👁️</button>
+                <div id="phone-secret-text" class="hidden"></div>
+                <button id="phone-close-btn" class="btn-secondary hidden">Compris, fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
