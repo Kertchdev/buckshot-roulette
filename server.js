@@ -5,7 +5,12 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    cors: {
+        origin: "*", // Permet à n'importe quel client (Electron ou Navigateur) de se connecter
+        methods: ["GET", "POST"]
+    }
+});
 
 const PORT = 3000;
 

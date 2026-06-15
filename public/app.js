@@ -469,6 +469,13 @@ function createItemEl(key, pNum, idx) {
     el.className = 'item';
     el.innerText = d.icon;
     el.setAttribute('data-tooltip', `${d.name} :\n${d.desc}`);
+    
+    // Si c'est l'IA, les objets ne sont JAMAIS cliquables par le joueur humain
+    if (gameState.isAIMode && pNum === 2) {
+        el.classList.add('disabled');
+        return el;
+    }
+    
     const isMyTurn = gameState.isOnlineMode ? (gameState.currentTurn === myPlayerNum && pNum === myPlayerNum)
                                             : (gameState.currentTurn === pNum);
     if (!isMyTurn) { el.classList.add('disabled'); }
