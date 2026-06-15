@@ -45,32 +45,18 @@ let socket = null;
 let myPlayerNum = null;
 
 function initSocket() {
-    if (socket) return;
+    if (socket) return true;
     
     // On récupère l'adresse entrée par le joueur
     const serverUrl = document.getElementById('server-url').value.trim();
     if (!serverUrl) { showToast("Veuillez entrer une adresse de serveur"); return false; }
     
-    // On charge le script socket.io dynamiquement depuis ce serveur
-    // Si on lance le .exe, on n'a pas forcément le script localement
-    if (typeof io === 'undefined') {
-        const script = document.createElement('script');
-        script.src = `${serverUrl}/socket.io/socket.io.js`;
-        script.onload = () => {
-            setupSocketConnection(serverUrl);
-        };
-        script.onerror = () => {
-            showToast("Impossible de se connecter au serveur ! (Script manquant)");
-        };
-        document.head.appendChild(script);
-    } else {
-        setupSocketConnection(serverUrl);
-    }
-    return true;
-}
-
-function setupSocketConnection(serverUrl) {
+    // Connexion via CDN Socket.io (plus fiable que le chargement dynamique)
     socket = io(serverUrl);
+    
+    socket.on('connect_error', () => {
+        showToast("Impossible de se connecter à " + serverUrl);
+    });
 
     socket.on('room_created', ({ roomId, playerNum }) => {
         myPlayerNum = playerNum;
@@ -218,10 +204,7 @@ document.getElementById('btn-quit').addEventListener('click', () => switchScreen
 document.getElementById('btn-create-room').addEventListener('click', () => {
     if (!initSocket()) return;
     const pseudo = document.getElementById('online-pseudo').value.trim() || 'Joueur';
-    // On doit s'assurer que le socket est bien connecté avant d'émettre
-    setTimeout(() => {
-        if(socket) socket.emit('create_room', { pseudo });
-    }, 500);
+    socket.emit('create_room', { pseudo });
 });
 
 document.getElementById('btn-join-room').addEventListener('click', () => {
@@ -229,9 +212,7 @@ document.getElementById('btn-join-room').addEventListener('click', () => {
     const pseudo = document.getElementById('online-pseudo').value.trim() || 'Joueur';
     const code   = document.getElementById('room-code-input').value.trim().toUpperCase();
     if (!code) { showToast("Entrez un code de salle !"); return; }
-    setTimeout(() => {
-        if(socket) socket.emit('join_room', { roomId: code, pseudo });
-    }, 500);
+    socket.emit('join_room', { roomId: code, pseudo });
 });
 
 document.getElementById('btn-start-online').addEventListener('click', () => {
