@@ -200,6 +200,23 @@ document.getElementById('btn-back-from-lobby').addEventListener('click', () => s
 document.getElementById('btn-leave-room').addEventListener('click', () => { location.reload(); });
 document.getElementById('btn-quit').addEventListener('click', () => switchScreen(screens.menu));
 
+// --- Fermer le programme (menu principal) ---
+document.getElementById('btn-exit-app').addEventListener('click', () => {
+    if (window.electronAPI) {
+        window.electronAPI.quitApp();
+    } else {
+        window.close();
+    }
+});
+
+// --- Quitter la partie en cours ---
+document.getElementById('btn-quit-game').addEventListener('click', () => {
+    if (confirm('Voulez-vous vraiment quitter la partie ?')) {
+        if (socket) { socket.disconnect(); socket = null; }
+        switchScreen(screens.menu);
+    }
+});
+
 // --- Lobby En Ligne ---
 document.getElementById('btn-create-room').addEventListener('click', () => {
     if (!initSocket()) return;
