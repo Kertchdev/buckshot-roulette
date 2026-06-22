@@ -285,6 +285,7 @@ io.on('connection', (socket) => {
             p2Items: gs.player2.items,
             damageMultiplier: gs.damageMultiplier,
             skipOpponentTurn: gs.skipOpponentTurn,
+            bulletsLeft: gs.magazine.length
         };
 
         io.to(socket.roomId).emit('item_effect', { ...effect, secret: false, update });

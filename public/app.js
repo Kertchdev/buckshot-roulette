@@ -122,7 +122,7 @@ function initSocket() {
                 setActionButtonsEnabled(false);
                 setTimeout(() => {
                     logAction(`Début de la prochaine étape...`);
-                    // L'état serveur arrivera via le prochain shot ou item
+                    updateTurnUI(); // Réactive les boutons après la pause
                 }, 3000);
             }
             
@@ -145,7 +145,7 @@ function initSocket() {
                 gameState.player2.items  = data.update.p2Items;
                 gameState.damageMultiplier   = data.update.damageMultiplier;
                 gameState.skipOpponentTurn   = data.update.skipOpponentTurn;
-                updateHealthUI(); updateInventoryUI(); updateTableUI(gameState.magazine.length);
+                updateHealthUI(); updateInventoryUI(); updateTableUI(data.update.bulletsLeft);
             }
         } else {
             // Info secrète — seulement le joueur qui a utilisé l'objet la reçoit
