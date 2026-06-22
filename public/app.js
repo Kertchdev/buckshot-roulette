@@ -33,8 +33,11 @@ const screens = {
     menu:        document.getElementById('main-menu'),
     setup:       document.getElementById('setup-screen'),
     onlineLobby: document.getElementById('online-lobby'),
+    onlineLobbyFfa: document.getElementById('online-lobby-ffa'),
     waitingRoom: document.getElementById('waiting-room'),
+    waitingRoomFfa: document.getElementById('waiting-room-ffa'),
     game:        document.getElementById('game-screen'),
+    gameFfa:     document.getElementById('game-screen-ffa'),
     gameOver:    document.getElementById('game-over-screen')
 };
 
@@ -160,15 +163,112 @@ function initSocket() {
         const div = document.createElement('div');
         div.className = 'chat-msg';
         div.innerHTML = `<span class="chat-time">${time}</span><span class="chat-pseudo">${pseudo}</span> : ${message}`;
-        const box = document.getElementById('chat-messages');
-        box.appendChild(div);
-        box.scrollTop = box.scrollHeight;
+        let box = document.getElementById('chat-messages');
+        if (screens.gameFfa.classList.contains('active')) {
+            box = document.getElementById('chat-messages-ffa');
+        }
+        if (box) {
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
     });
 
     socket.on('error_msg', (msg) => showToast(msg));
     socket.on('opponent_disconnected', () => {
-        showToast("Votre adversaire s'est déconnecté.");
+        showToast("Un adversaire s'est déconnecté.");
         switchScreen(screens.menu);
+    });
+
+    // =============================================
+    // SOCKET EVENTS FFA
+    // =============================================
+
+    socket.on('ffa_room_created', ({ roomId, playerNum }) => {
+        myPlayerNum = playerNum;
+        document.getElementById('room-code-big-ffa').innerText = roomId;
+        document.getElementById('ffa-player-count').innerText = 1;
+        document.getElementById('ffa-players-list').innerHTML = `<li>👑 Vous (Hôte)</li>`;
+        document.getElementById('btn-start-online-ffa').classList.remove('hidden');
+        document.getElementById('btn-start-online-ffa').disabled = true; // Attente 3 joueurs min
+        switchScreen(screens.waitingRoomFfa);
+    });
+
+    socket.on('ffa_room_joined', ({ roomId, playerNum, players }) => {
+        myPlayerNum = playerNum;
+        document.getElementById('room-code-big-ffa').innerText = roomId;
+        updateFFALobbyList(players);
+        document.getElementById('btn-start-online-ffa').classList.add('hidden'); // Seul le créateur peut lancer
+        switchScreen(screens.waitingRoomFfa);
+    });
+
+    socket.on('ffa_player_joined', ({ players }) => {
+        updateFFALobbyList(players);
+        if (myPlayerNum === 1) {
+            document.getElementById('btn-start-online-ffa').disabled = players.length < 3;
+        }
+    });
+
+    socket.on('ffa_game_started', ({ gameState: gs }) => {
+        ffaGameState = gs;
+        ffaSelectedTargetId = null;
+        document.querySelector('#action-log-ffa ul').innerHTML = '';
+        if(document.getElementById('chat-panel-ffa')) document.getElementById('chat-panel-ffa').classList.remove('hidden');
+        renderFFAUI();
+        switchScreen(screens.gameFfa);
+        logFFAAction("Partie FFA démarrée !");
+    });
+
+    socket.on('ffa_shot_result', (r) => {
+        const isLive = r.bullet === 'live';
+        playShootEffect(isLive);
+        setTimeout(() => {
+            if (isLive) {
+                logFFAAction(`${r.shooterName} tire sur ${r.targetName}... BOOM! (-${r.damage} PV)`, 'log-damage');
+            } else {
+                logFFAAction(`${r.shooterName} tire sur ${r.targetName}... *Clic* (À Blanc)`, 'log-blank');
+            }
+            ffaGameState = r.gameState;
+            ffaSelectedTargetId = null;
+            renderFFAUI();
+            
+            if (r.newRound && !r.gameOver) logFFAAction("Nouvelle manche !");
+            
+            if (r.gameOver) {
+                setTimeout(() => {
+                    document.getElementById('winner-name').innerText = `${r.winner} a remporté le FFA !`;
+                    switchScreen(screens.gameOver);
+                }, 1200);
+            }
+        }, 800);
+    });
+
+    socket.on('ffa_item_effect', (data) => {
+        if (!data.secret) {
+            logFFAAction(`${data.playerName} utilise ${ITEM_TYPES[data.itemKey]?.name || data.itemKey}${data.targetName ? " sur " + data.targetName : ""}.`, 'log-blank');
+            ffaGameState = data.gameState;
+            renderFFAUI();
+        } else {
+            if (data.itemKey === 'magnifier') {
+                const txt = data.secretData.nextBullet === 'live' ? '🔴 Réelle' : '⚪️ À Blanc';
+                openPhoneModal(`La prochaine balle est : ${txt}`);
+            } else if (data.itemKey === 'phone') {
+                const txt = data.secretData.type === 'live' ? '🔴 Réelle' : '⚪️ À Blanc';
+                openPhoneModal(`Balle n°${data.secretData.pos + 1} = ${txt}`);
+            }
+        }
+    });
+    
+    return true;
+}
+
+function updateFFALobbyList(players) {
+    document.getElementById('ffa-player-count').innerText = players.length;
+    const ul = document.getElementById('ffa-players-list');
+    ul.innerHTML = '';
+    players.forEach((p, idx) => {
+        const li = document.createElement('li');
+        li.innerText = `${idx === 0 ? '👑 ' : '👤 '}${p.pseudo}${p.playerNum === myPlayerNum ? ' (Vous)' : ''}`;
+        ul.appendChild(li);
     });
 }
 
@@ -237,6 +337,24 @@ document.getElementById('btn-join-room').addEventListener('click', () => {
     const code   = document.getElementById('room-code-input').value.trim().toUpperCase();
     if (!code) { showToast("Entrez un code de salle !"); return; }
     socket.emit('join_room', { roomId: code, pseudo });
+});
+
+document.getElementById('btn-create-room-ffa').addEventListener('click', () => {
+    if (!initSocket()) return;
+    const pseudo = document.getElementById('online-pseudo-ffa').value.trim() || 'Joueur';
+    socket.emit('ffa_create_room', { pseudo });
+});
+
+document.getElementById('btn-join-room-ffa').addEventListener('click', () => {
+    if (!initSocket()) return;
+    const pseudo = document.getElementById('online-pseudo-ffa').value.trim() || 'Joueur';
+    const code   = document.getElementById('room-code-input-ffa').value.trim().toUpperCase();
+    if (!code) { showToast("Entrez un code de salle !"); return; }
+    socket.emit('ffa_join_room', { roomId: code, pseudo });
+});
+
+document.getElementById('btn-start-online-ffa').addEventListener('click', () => {
+    socket.emit('ffa_start_game');
 });
 
 document.getElementById('btn-start-online').addEventListener('click', () => {
@@ -658,4 +776,133 @@ function aiHard(prob) {
     }
     logAction(`[IA - Difficile] Le Croupier décide...`);
     if (prob >= 0.6) handleShoot('opponent'); else handleShoot('self');
+}
+
+// =============================================
+// LOGIQUE UI - FFA (Chacun Pour Soi)
+// =============================================
+let ffaGameState = null;
+let ffaSelectedTargetId = null;
+
+function renderFFAUI() {
+    if (!ffaGameState) return;
+
+    const me = ffaGameState.players.find(p => p.playerNum === myPlayerNum);
+    
+    // --- Joueur Local ---
+    document.getElementById('local-name').innerText = me.pseudo + (me.dead ? " (MORT)" : "");
+    const localHealth = document.getElementById('local-health');
+    localHealth.innerHTML = '';
+    for (let i = 0; i < 3; i++) {
+        const h = document.createElement('div');
+        h.className = 'heart' + (i < me.health ? ' active' : '');
+        localHealth.appendChild(h);
+    }
+    const localInv = document.getElementById('local-inventory');
+    localInv.innerHTML = '';
+    if (!me.dead) {
+        me.items.forEach((item, idx) => {
+            const btn = document.createElement('div');
+            btn.className = 'item';
+            btn.innerText = ITEM_TYPES[item].icon;
+            btn.dataset.tooltip = ITEM_TYPES[item].desc;
+            btn.onclick = () => {
+                if (ffaGameState.players[ffaGameState.currentTurnIndex].playerNum !== myPlayerNum) return;
+                if (item === 'handcuffs') {
+                    if (!ffaSelectedTargetId) { showToast("Sélectionnez une cible pour les menottes !"); return; }
+                    socket.emit('ffa_use_item', { itemKey: item, itemIndex: idx, targetId: ffaSelectedTargetId });
+                } else {
+                    socket.emit('ffa_use_item', { itemKey: item, itemIndex: idx });
+                }
+            };
+            localInv.appendChild(btn);
+        });
+    }
+
+    // --- Adversaires ---
+    const oppZone = document.getElementById('ffa-opponents-zone');
+    oppZone.innerHTML = '';
+    ffaGameState.players.forEach(p => {
+        if (p.playerNum === myPlayerNum) return;
+        const card = document.createElement('div');
+        card.style.background = 'rgba(20,20,30,0.8)';
+        card.style.padding = '10px';
+        card.style.borderRadius = '8px';
+        card.style.border = (ffaSelectedTargetId === p.playerNum) ? '2px solid var(--accent-red)' : '1px solid #444';
+        card.style.textAlign = 'center';
+        card.style.cursor = p.dead ? 'default' : 'pointer';
+        card.style.minWidth = '120px';
+        if (p.dead) card.style.opacity = '0.3';
+        if (p.handcuffed) card.style.boxShadow = '0 0 10px #2980b9';
+
+        card.innerHTML = `
+            <div style="font-weight:bold;margin-bottom:5px;">${p.pseudo}</div>
+            <div class="health-bar" style="justify-content:center;transform:scale(0.8)">
+                ${'<div class="heart active"></div>'.repeat(p.health)}${'<div class="heart"></div>'.repeat(3 - p.health)}
+            </div>
+            <div style="font-size:0.8rem;margin-top:5px;color:#aaa;">${p.items.length} objet(s)</div>
+            ${p.handcuffed ? '<div style="font-size:1.5rem">🔗</div>' : ''}
+            ${p.dead ? '<div style="color:red;font-weight:bold;">MORT</div>' : ''}
+        `;
+
+        if (!p.dead) {
+            card.onclick = () => {
+                ffaSelectedTargetId = p.playerNum;
+                renderFFAUI();
+            };
+        }
+        oppZone.appendChild(card);
+    });
+
+    // --- Table & Boutons ---
+    const current = ffaGameState.players[ffaGameState.currentTurnIndex];
+    document.getElementById('round-announcement-ffa').innerText = `Tour de : ${current.pseudo}`;
+    document.getElementById('count-live-ffa').innerText = ffaGameState.roundLiveCount;
+    document.getElementById('count-blank-ffa').innerText = ffaGameState.roundBlankCount;
+    document.getElementById('bullets-left-ffa').innerText = ffaGameState.bulletsLeft;
+
+    const myTurn = (current.playerNum === myPlayerNum && !me.dead);
+    const noAmmo = (ffaGameState.bulletsLeft === 0);
+    
+    document.getElementById('btn-shoot-self-ffa').disabled = !myTurn || noAmmo;
+    document.getElementById('btn-shoot-target-ffa').disabled = !myTurn || noAmmo || !ffaSelectedTargetId;
+}
+
+function logFFAAction(msg, className) {
+    const ul = document.querySelector('#action-log-ffa ul');
+    const li = document.createElement('li');
+    li.innerText = msg;
+    if (className) li.className = className;
+    ul.appendChild(li);
+    const container = document.getElementById('action-log-ffa');
+    container.scrollTop = container.scrollHeight;
+}
+
+document.getElementById('btn-shoot-self-ffa').addEventListener('click', () => {
+    socket.emit('ffa_shoot', { targetId: myPlayerNum });
+    document.getElementById('btn-shoot-self-ffa').disabled = true;
+});
+
+document.getElementById('btn-shoot-target-ffa').addEventListener('click', () => {
+    if (!ffaSelectedTargetId) { showToast("Sélectionnez une cible !"); return; }
+    socket.emit('ffa_shoot', { targetId: ffaSelectedTargetId });
+    document.getElementById('btn-shoot-target-ffa').disabled = true;
+});
+
+// --- Quitter FFA ---
+document.getElementById('btn-quit-game-ffa').addEventListener('click', () => {
+    if (confirm('Voulez-vous vraiment quitter la partie FFA ?')) {
+        if (socket) { socket.disconnect(); socket = null; }
+        location.reload();
+    }
+});
+
+// --- Chat FFA ---
+document.getElementById('chat-send-btn-ffa').addEventListener('click', sendChatFFA);
+document.getElementById('chat-input-ffa').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChatFFA(); });
+function sendChatFFA() {
+    const msg = document.getElementById('chat-input-ffa').value.trim();
+    if (!msg || !socket) return;
+    socket.emit('chat_message', { message: msg });
+    document.getElementById('chat-input-ffa').value = '';
 }

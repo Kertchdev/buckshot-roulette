@@ -301,6 +301,179 @@ io.on('connection', (socket) => {
         io.to(socket.roomId).emit('chat_message', payload);
     });
 
+    // =============================================
+    // MODE FFA (3 à 5 Joueurs)
+    // =============================================
+
+    socket.on('ffa_create_room', ({ pseudo }) => {
+        const roomId = Math.random().toString(36).substr(2, 6).toUpperCase();
+        rooms[roomId] = {
+            mode: 'FFA',
+            players: [{ id: socket.id, pseudo, playerNum: 1 }],
+            gameState: null,
+            chat: []
+        };
+        socket.join(roomId);
+        socket.roomId = roomId;
+        socket.playerNum = 1;
+        socket.pseudo = pseudo;
+        socket.emit('ffa_room_created', { roomId, playerNum: 1 });
+        console.log(`[FFA Room] ${pseudo} crée la salle FFA ${roomId}`);
+    });
+
+    socket.on('ffa_join_room', ({ roomId, pseudo }) => {
+        const room = rooms[roomId.toUpperCase()];
+        if (!room) { socket.emit('error_msg', 'Salle introuvable.'); return; }
+        if (room.mode !== 'FFA') { socket.emit('error_msg', 'Ce n\'est pas une salle FFA.'); return; }
+        if (room.players.length >= 5) { socket.emit('error_msg', 'Salle pleine (5 joueurs max).'); return; }
+        if (room.gameState) { socket.emit('error_msg', 'La partie a déjà commencé.'); return; }
+
+        const playerNum = room.players.length + 1;
+        room.players.push({ id: socket.id, pseudo, playerNum });
+        socket.join(roomId.toUpperCase());
+        socket.roomId = roomId.toUpperCase();
+        socket.playerNum = playerNum;
+        socket.pseudo = pseudo;
+
+        socket.emit('ffa_room_joined', { roomId: roomId.toUpperCase(), playerNum, players: room.players });
+        io.to(socket.roomId).emit('ffa_player_joined', { players: room.players });
+        console.log(`[FFA Room] ${pseudo} rejoint ${roomId.toUpperCase()} (${room.players.length}/5)`);
+    });
+
+    socket.on('ffa_start_game', () => {
+        const room = rooms[socket.roomId];
+        if (!room || room.mode !== 'FFA' || room.players.length < 3 || socket.playerNum !== 1) return;
+
+        const gs = createFFAGameState(room.players);
+        generateRoundFFA(gs);
+        room.gameState = gs;
+
+        io.to(socket.roomId).emit('ffa_game_started', { gameState: sanitizeGSFFA(gs) });
+        console.log(`[FFA Game] Partie lancée dans ${socket.roomId} avec ${room.players.length} joueurs`);
+    });
+
+    socket.on('ffa_shoot', ({ targetId }) => {
+        const room = rooms[socket.roomId];
+        if (!room || !room.gameState || room.mode !== 'FFA') return;
+        const gs = room.gameState;
+        
+        const currentPlayer = gs.players[gs.currentTurnIndex];
+        if (currentPlayer.playerNum !== socket.playerNum) return;
+        if (gs.magazine.length === 0) return;
+
+        const bullet = gs.magazine.shift();
+        const isLive = bullet === 'live';
+
+        if (isLive) gs.roundLiveCount--;
+        else gs.roundBlankCount--;
+
+        const targetPlayer = gs.players.find(p => p.playerNum === targetId);
+        if (!targetPlayer || targetPlayer.dead) return;
+
+        let damage = 0;
+        let nextTurnAction = 'pass';
+
+        if (isLive) {
+            damage = gs.damageMultiplier;
+            targetPlayer.health -= damage;
+            if (targetPlayer.health < 0) targetPlayer.health = 0;
+            if (targetPlayer.health === 0) targetPlayer.dead = true;
+        } else {
+            if (targetPlayer.playerNum === currentPlayer.playerNum) {
+                nextTurnAction = 'keep';
+            }
+        }
+
+        const aliveCount = gs.players.filter(p => !p.dead).length;
+        let gameOver = false;
+        let winner = null;
+
+        if (aliveCount <= 1) {
+            gameOver = true;
+            winner = gs.players.find(p => !p.dead)?.pseudo || "Personne";
+        }
+
+        let newRound = false;
+        if (!gameOver && gs.magazine.length === 0) {
+            generateRoundFFA(gs);
+            newRound = true;
+            nextTurnAction = 'pass';
+        }
+
+        if (nextTurnAction === 'pass') {
+            gs.damageMultiplier = 1;
+            do {
+                gs.currentTurnIndex = (gs.currentTurnIndex + 1) % gs.players.length;
+                let nextPlayer = gs.players[gs.currentTurnIndex];
+                if (!nextPlayer.dead && nextPlayer.handcuffed) {
+                    nextPlayer.handcuffed = false;
+                    // On le saute
+                } else if (!nextPlayer.dead) {
+                    break;
+                }
+            } while (true);
+        }
+
+        io.to(socket.roomId).emit('ffa_shot_result', {
+            bullet: isLive ? 'live' : 'blank',
+            shooterId: currentPlayer.playerNum,
+            shooterName: currentPlayer.pseudo,
+            targetId: targetPlayer.playerNum,
+            targetName: targetPlayer.pseudo,
+            damage,
+            gameOver,
+            winner,
+            newRound,
+            gameState: sanitizeGSFFA(gs)
+        });
+    });
+
+    socket.on('ffa_use_item', ({ itemKey, itemIndex, targetId }) => {
+        const room = rooms[socket.roomId];
+        if (!room || !room.gameState || room.mode !== 'FFA') return;
+        const gs = room.gameState;
+        
+        const player = gs.players[gs.currentTurnIndex];
+        if (player.playerNum !== socket.playerNum) return;
+
+        if (player.items[itemIndex] !== itemKey) return;
+        player.items.splice(itemIndex, 1);
+
+        let effect = { itemKey, playerName: player.pseudo, shooterId: player.playerNum };
+
+        switch (itemKey) {
+            case 'magnifier':
+                const nextBullet = gs.magazine[0] === 'live' ? 'live' : 'blank';
+                socket.emit('ffa_item_effect', { ...effect, secret: true, secretData: { nextBullet }, gameState: sanitizeGSFFA(gs) });
+                io.to(socket.roomId).emit('ffa_item_effect', { ...effect, secret: false, gameState: sanitizeGSFFA(gs) });
+                return;
+            case 'handcuffs':
+                const targetPlayer = gs.players.find(p => p.playerNum === targetId);
+                if (targetPlayer && !targetPlayer.dead) {
+                    targetPlayer.handcuffed = true;
+                    effect.targetName = targetPlayer.pseudo;
+                }
+                break;
+            case 'cigarette':
+                if (player.health < 3) player.health++;
+                break;
+            case 'saw':
+                if (gs.damageMultiplier === 1) gs.damageMultiplier = 2;
+                break;
+            case 'phone':
+                if (gs.magazine.length > 0) {
+                    const pos = Math.floor(Math.random() * gs.magazine.length);
+                    const type = gs.magazine[pos];
+                    socket.emit('ffa_item_effect', { ...effect, secret: true, secretData: { pos, type }, gameState: sanitizeGSFFA(gs) });
+                    io.to(socket.roomId).emit('ffa_item_effect', { ...effect, secret: false, gameState: sanitizeGSFFA(gs) });
+                    return;
+                }
+                break;
+        }
+
+        io.to(socket.roomId).emit('ffa_item_effect', { ...effect, secret: false, gameState: sanitizeGSFFA(gs) });
+    });
+
     // --- DÉCONNEXION ---
     socket.on('disconnect', () => {
         console.log(`[-] Déconnexion : ${socket.id}`);
@@ -322,6 +495,70 @@ function sanitizeGS(gs, playerNum) {
         currentTurn: gs.currentTurn,
         damageMultiplier: gs.damageMultiplier,
         skipOpponentTurn: gs.skipOpponentTurn,
+    };
+}
+
+// =============================================
+// HELPER FONCTIONS FFA
+// =============================================
+
+function createFFAGameState(playersList) {
+    const players = playersList.map(p => ({
+        id: p.id,
+        pseudo: p.pseudo,
+        playerNum: p.playerNum,
+        health: 3,
+        items: [],
+        score: 0,
+        dead: false,
+        handcuffed: false
+    }));
+    return {
+        players,
+        magazine: [],
+        roundLiveCount: 0,
+        roundBlankCount: 0,
+        currentTurnIndex: 0,
+        damageMultiplier: 1,
+        started: true
+    };
+}
+
+function generateRoundFFA(gs) {
+    const aliveCount = gs.players.filter(p => !p.dead).length;
+    const total = Math.floor(Math.random() * 4) + 2 + aliveCount; // Plus de joueurs = plus de balles (ex: 3 joueurs = 5 à 8 balles)
+    let lives = Math.floor(total / 2);
+    if (lives === 0) lives = 1;
+    const blanks = total - lives;
+
+    gs.roundLiveCount = lives;
+    gs.roundBlankCount = blanks;
+
+    gs.magazine = [];
+    for (let i = 0; i < lives; i++) gs.magazine.push('live');
+    for (let i = 0; i < blanks; i++) gs.magazine.push('blank');
+    shuffle(gs.magazine);
+
+    const fillItems = (player) => {
+        while (player.items.length < 4) {
+            player.items.push(ITEM_KEYS[Math.floor(Math.random() * ITEM_KEYS.length)]);
+        }
+    };
+    gs.players.forEach(p => {
+        if (!p.dead) {
+            fillItems(p);
+            p.handcuffed = false; // Reset menottes
+        }
+    });
+
+    gs.damageMultiplier = 1;
+}
+
+function sanitizeGSFFA(gs) {
+    return {
+        ...gs,
+        magazine: [], // Masquer les balles
+        bulletsLeft: gs.magazine.length
     };
 }
 
