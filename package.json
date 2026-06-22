@@ -15,14 +15,12 @@
       "output": "dist"
     },
     "win": {
-      "icon": "icon.png",
       "target": "nsis"
     },
     "files": [
       "main.js",
       "preload.js",
-      "public/**/*",
-      "icon.png"
+      "public/**/*"
     ]
   },
   "keywords": [],
@@ -35,6 +33,7 @@
   },
   "devDependencies": {
     "electron": "^42.4.0",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "png-to-ico": "^3.0.1"
   }
 }

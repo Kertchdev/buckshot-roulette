@@ -198,7 +198,7 @@ document.getElementById('btn-online-lobby').addEventListener('click', () => {
 document.getElementById('btn-back-menu').addEventListener('click', () => switchScreen(screens.menu));
 document.getElementById('btn-back-from-lobby').addEventListener('click', () => switchScreen(screens.menu));
 document.getElementById('btn-leave-room').addEventListener('click', () => { location.reload(); });
-document.getElementById('btn-quit').addEventListener('click', () => switchScreen(screens.menu));
+document.getElementById('btn-quit').addEventListener('click', () => { location.reload(); });
 
 // --- Fermer le programme (menu principal) ---
 document.getElementById('btn-exit-app').addEventListener('click', () => {
@@ -213,7 +213,7 @@ document.getElementById('btn-exit-app').addEventListener('click', () => {
 document.getElementById('btn-quit-game').addEventListener('click', () => {
     if (confirm('Voulez-vous vraiment quitter la partie ?')) {
         if (socket) { socket.disconnect(); socket = null; }
-        switchScreen(screens.menu);
+        location.reload(); // Hard reset pour nettoyer tous les timeouts (IA, etc.)
     }
 });
 
@@ -376,7 +376,8 @@ function passTurn() {
 }
 
 function setActionButtonsEnabled(enabled) {
-    const noAmmo = gameState.magazine.length === 0;
+    const bulletsCount = parseInt(document.getElementById('bullets-left').innerText) || 0;
+    const noAmmo = bulletsCount === 0;
     document.getElementById('btn-shoot-self').disabled     = !enabled || noAmmo;
     document.getElementById('btn-shoot-opponent').disabled = !enabled || noAmmo;
 }
