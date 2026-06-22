@@ -84,7 +84,8 @@ function initSocket() {
         applyServerState(gs);
         gameState.isOnlineMode = true;
         document.querySelector('#action-log ul').innerHTML = '';
-        document.getElementById('chat-panel').classList.remove('hidden');
+        if(document.getElementById('chat-panel')) document.getElementById('chat-panel').classList.remove('hidden');
+        updateViewOrder();
         switchScreen(screens.game);
         logAction("Partie en ligne démarrée !");
     });
@@ -195,9 +196,15 @@ document.getElementById('btn-online-lobby').addEventListener('click', () => {
     switchScreen(screens.onlineLobby);
 });
 
+document.getElementById('btn-online-ffa').addEventListener('click', () => {
+    switchScreen(screens.onlineLobbyFfa);
+});
+
 document.getElementById('btn-back-menu').addEventListener('click', () => switchScreen(screens.menu));
 document.getElementById('btn-back-from-lobby').addEventListener('click', () => switchScreen(screens.menu));
+document.getElementById('btn-back-from-lobby-ffa').addEventListener('click', () => switchScreen(screens.menu));
 document.getElementById('btn-leave-room').addEventListener('click', () => { location.reload(); });
+document.getElementById('btn-leave-room-ffa').addEventListener('click', () => { location.reload(); });
 document.getElementById('btn-quit').addEventListener('click', () => { location.reload(); });
 
 // --- Fermer le programme (menu principal) ---
@@ -249,7 +256,8 @@ document.getElementById('btn-start-game').addEventListener('click', () => {
     document.getElementById('p1-name').innerText = gameState.player1.name;
     document.getElementById('p2-name').innerText = gameState.player2.name;
     document.querySelector('#action-log ul').innerHTML = '';
-    document.getElementById('chat-panel').classList.add('hidden');
+    if(document.getElementById('chat-panel')) document.getElementById('chat-panel').classList.add('hidden');
+    updateViewOrder();
     switchScreen(screens.game);
 });
 
@@ -429,6 +437,19 @@ function updateTurnUI() {
 function updateScoreUI() {
     document.getElementById('p1-name').innerText = `${gameState.player1.name} (Score: ${gameState.player1.score}/3)`;
     document.getElementById('p2-name').innerText = `${gameState.player2.name} (Score: ${gameState.player2.score}/3)`;
+}
+
+function updateViewOrder() {
+    // Si on est le Joueur 2 en ligne, on inverse l'affichage pour avoir son interface en bas.
+    if (gameState.isOnlineMode && myPlayerNum === 2) {
+        document.getElementById('player2-ui').style.order = 3;
+        document.querySelector('.center-table').style.order = 2;
+        document.getElementById('player1-ui').style.order = 1;
+    } else {
+        document.getElementById('player2-ui').style.order = 1;
+        document.querySelector('.center-table').style.order = 2;
+        document.getElementById('player1-ui').style.order = 3;
+    }
 }
 
 function updateHealthUI() {

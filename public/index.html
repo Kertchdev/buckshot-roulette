@@ -16,7 +16,8 @@
             <div class="menu-buttons">
                 <button id="btn-local" class="btn-primary">Multijoueur Local</button>
                 <button id="btn-ai-setup" class="btn-primary">Contre l'IA</button>
-                <button id="btn-online-lobby" class="btn-primary">En Ligne 🌐</button>
+                <button id="btn-online-lobby" class="btn-primary">En Ligne (1v1) 🌐</button>
+                <button id="btn-online-ffa" class="btn-primary">En Ligne (3-5 Joueurs) ⚔️</button>
             </div>
             <button id="btn-exit-app" class="btn-secondary" style="margin-top: 30px; font-size: 1rem; padding: 10px 20px;">Fermer le jeu</button>
         </div>
@@ -146,6 +147,105 @@
                 <div class="chat-input-row">
                     <input type="text" id="chat-input" placeholder="Message..." maxlength="200">
                     <button id="chat-send-btn">➤</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lobby Multijoueur FFA -->
+        <div id="online-lobby-ffa" class="screen hidden">
+            <h2>Multijoueur Chacun Pour Soi (FFA) ⚔️</h2>
+            <div class="input-group">
+                <label for="server-url-ffa">Adresse du serveur :</label>
+                <input type="text" id="server-url-ffa" value="http://localhost:3000">
+            </div>
+            <div class="input-group">
+                <label for="online-pseudo-ffa">Votre pseudo :</label>
+                <input type="text" id="online-pseudo-ffa" placeholder="Ex: Survivant">
+            </div>
+            <div class="lobby-buttons">
+                <button id="btn-create-room-ffa" class="btn-primary">Créer une salle FFA</button>
+                <div class="lobby-or">— ou —</div>
+                <div class="input-group">
+                    <label for="room-code-input-ffa">Code de salle :</label>
+                    <input type="text" id="room-code-input-ffa" placeholder="Ex: FFA123" maxlength="6" style="text-transform:uppercase">
+                </div>
+                <button id="btn-join-room-ffa" class="btn-secondary">Rejoindre FFA</button>
+            </div>
+            <button id="btn-back-from-lobby-ffa" class="btn-secondary" style="margin-top:20px">Retour</button>
+        </div>
+
+        <!-- Salle d'attente FFA -->
+        <div id="waiting-room-ffa" class="screen hidden">
+            <h2>Salle d'attente (FFA)</h2>
+            <div class="room-code-display">
+                <p>Code de votre salle :</p>
+                <div id="room-code-big-ffa"></div>
+                <p class="code-hint">Donnez ce code à vos amis ! (3 à 5 joueurs)</p>
+            </div>
+            <div style="background: rgba(0,0,0,0.6); padding: 20px; border-radius: 10px; min-width: 300px; text-align: center; margin-bottom: 20px;">
+                <h3>Joueurs connectés (<span id="ffa-player-count">1</span>/5)</h3>
+                <ul id="ffa-players-list" style="list-style: none; padding: 0; margin-top: 15px; font-size: 1.2rem; line-height: 1.8;">
+                    <!-- Liste des joueurs générée ici -->
+                </ul>
+            </div>
+            <p id="waiting-status-ffa">En attente de joueurs... (3 minimum)</p>
+            <button id="btn-start-online-ffa" class="btn-primary hidden" disabled>Lancer la partie FFA !</button>
+            <button id="btn-leave-room-ffa" class="btn-secondary">Quitter la salle</button>
+        </div>
+
+        <!-- Écran de Jeu FFA -->
+        <div id="game-screen-ffa" class="screen hidden">
+            <button id="btn-quit-game-ffa" class="btn-secondary" style="position: absolute; top: 15px; right: 15px; padding: 8px 15px; font-size: 0.9rem; z-index: 50;">Quitter la partie</button>
+            
+            <!-- Interface des Adversaires (Haut) -->
+            <div id="ffa-opponents-zone" style="width: 100%; display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; padding: 20px; z-index: 10;">
+                <!-- Généré dynamiquement -->
+            </div>
+
+            <!-- Table au centre -->
+            <div class="center-table">
+                <div class="round-info">
+                    <p id="round-announcement-ffa">Le jeu va commencer...</p>
+                    <div class="magazine-stats">
+                        <span class="live-count"><span id="count-live-ffa">0</span> Réelles</span>
+                        <span class="blank-count"><span id="count-blank-ffa">0</span> À Blanc</span>
+                    </div>
+                </div>
+                <div class="gun-container">
+                    <div class="gun">🔫</div>
+                    <div class="magazine-status">Balles restantes : <span id="bullets-left-ffa">0</span></div>
+                </div>
+                <div class="action-buttons">
+                    <button id="btn-shoot-self-ffa" class="btn-action btn-danger" disabled>Se tirer dessus</button>
+                    <button id="btn-shoot-target-ffa" class="btn-action btn-attack" disabled>Tirer sur la cible</button>
+                </div>
+            </div>
+
+            <!-- Interface du Joueur Local (Bas) -->
+            <div id="local-player-ui" class="player-zone active-turn" style="margin-top: auto;">
+                <div class="player-info">
+                    <h3 id="local-name">Moi</h3>
+                    <div class="health-bar" id="local-health">
+                        <div class="heart active"></div><div class="heart active"></div><div class="heart active"></div>
+                    </div>
+                </div>
+                <div class="inventory" id="local-inventory">
+                    <!-- Items -->
+                </div>
+            </div>
+
+            <!-- Log des actions FFA -->
+            <div id="action-log-ffa" class="action-log">
+                <ul></ul>
+            </div>
+            
+            <!-- Chat Panel FFA -->
+            <div id="chat-panel-ffa" class="chat-panel hidden">
+                <div class="chat-header">💬 Chat</div>
+                <div class="chat-messages" id="chat-messages-ffa"></div>
+                <div class="chat-input-row">
+                    <input type="text" id="chat-input-ffa" placeholder="Message..." maxlength="200">
+                    <button id="chat-send-btn-ffa">➤</button>
                 </div>
             </div>
         </div>
